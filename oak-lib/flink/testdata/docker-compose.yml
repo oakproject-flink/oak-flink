@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  jobmanager:
+    image: flink:2.1.0-scala_2.12
+    container_name: flink-jobmanager-test
+    ports:
+      - "8081:8081"
+    # Run in Application mode with WordCount example (built-in to the Flink image)
+    command: |
+      bash -c "cp /opt/flink/examples/streaming/WordCount.jar /opt/flink/usrlib/ && \
+      /docker-entrypoint.sh standalone-job --job-classname org.apache.flink.streaming.examples.wordcount.WordCount"
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        rest.port: 8081
+        state.backend: filesystem
+        state.checkpoints.dir: file:///tmp/flink-checkpoints
+        state.savepoints.dir: file:///tmp/flink-savepoints
+        parallelism.default: 2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/overview"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+
+  taskmanager:
+    image: flink:2.1.0-scala_2.12
+    container_name: flink-taskmanager-test
+    depends_on:
+      jobmanager:
+        condition: service_healthy
+    command: taskmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        taskmanager.numberOfTaskSlots: 4
+        rest.port: 8081
+    scale: 1
