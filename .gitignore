@@ -1,0 +1,27 @@
+# Go build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+bin/
+*.test
+*.out
+vendor/
+
+# IDE
+.idea/
+.vscode/
+
+# Markdown files (blacklist all, then whitelist)
+*.md
+!README.md
+!LICENSE
+
+# Hidden files and folders (blacklist all, then whitelist)
+.*
+!.gitignore
+!.github/
+
+# OS
+.DS_Store
+Thumbs.db
