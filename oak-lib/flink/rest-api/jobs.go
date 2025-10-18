@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package flink
+package restapi
 
 import (
 	"context"
@@ -80,10 +80,10 @@ func (c *Client) GetJobConfig(ctx context.Context, jobID string) (*ConfigRespons
 		return nil, fmt.Errorf("failed to get job config for %s: %w", jobID, err)
 	}
 
-	var config ConfigResponse
-	if err := unmarshalResponse(resp, &config); err != nil {
+	var entries []ConfigEntry
+	if err := unmarshalResponse(resp, &entries); err != nil {
 		return nil, err
 	}
 
-	return &config, nil
+	return &ConfigResponse{Entries: entries}, nil
 }

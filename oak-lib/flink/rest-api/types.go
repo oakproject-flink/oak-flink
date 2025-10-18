@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package flink
+package restapi
 
 // JobStatus represents the state of a Flink job
 type JobStatus string
@@ -32,19 +32,19 @@ const (
 
 // Job represents a Flink job
 type Job struct {
-	ID     string    `json:"jid"`
-	Name   string    `json:"name"`
-	Status JobStatus `json:"state"`
+	ID     string    `json:"id"`
+	Name   string    `json:"name,omitempty"`
+	Status JobStatus `json:"status"`
 	// StartTime in milliseconds since epoch
-	StartTime int64 `json:"start-time"`
+	StartTime int64 `json:"start-time,omitempty"`
 	// EndTime in milliseconds since epoch
-	EndTime int64 `json:"end-time"`
+	EndTime int64 `json:"end-time,omitempty"`
 	// Duration in milliseconds
-	Duration int64 `json:"duration"`
+	Duration int64 `json:"duration,omitempty"`
 	// Parallelism of the job
 	Tasks struct {
 		Total int `json:"total"`
-	} `json:"tasks"`
+	} `json:"tasks,omitempty"`
 }
 
 // JobsOverview represents the overview of all jobs

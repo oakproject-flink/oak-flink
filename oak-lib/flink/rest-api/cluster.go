@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package flink
+package restapi
 
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 )
 
 // GetClusterOverview returns overview information about the Flink cluster
@@ -37,43 +39,75 @@ func (c *Client) GetClusterOverview(ctx context.Context) (*ClusterOverview, erro
 }
 
 // GetConfig returns the Flink cluster configuration
-// Endpoint: GET /config
+// Endpoint: GET /jobmanager/config
 // Available since: Flink 1.2
 func (c *Client) GetConfig(ctx context.Context) (*ConfigResponse, error) {
-	resp, err := c.doRequest(ctx, "GET", "/config", nil)
+	resp, err := c.doRequest(ctx, "GET", "/jobmanager/config", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cluster config: %w", err)
 	}
 
-	var config ConfigResponse
-	if err := unmarshalResponse(resp, &config); err != nil {
+	var entries []ConfigEntry
+	if err := unmarshalResponse(resp, &entries); err != nil {
 		return nil, err
 	}
 
-	return &config, nil
+	return &ConfigResponse{Entries: entries}, nil
+}
+
+// parseVersion parses a semantic version string and returns major, minor
+func parseVersion(version string) (major, minor int, err error) {
+	// Remove any prefix like "v" if present
+	version = strings.TrimPrefix(version, "v")
+
+	// Split by dots and parse
+	parts := strings.Split(version, ".")
+	if len(parts) < 2 {
+		return 0, 0, fmt.Errorf("invalid version format: %s", version)
+	}
+
+	major, err = strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid major version: %w", err)
+	}
+
+	minor, err = strconv.Atoi(parts[1])
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid minor version: %w", err)
+	}
+
+	return major, minor, nil
 }
 
 // DetectVersion attempts to auto-detect the Flink version from the cluster
+// Supported versions: Flink 1.18 through 2.1 (inclusive)
 func (c *Client) DetectVersion(ctx context.Context) (Version, error) {
 	overview, err := c.GetClusterOverview(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to detect version: %w", err)
 	}
 
-	// Parse version string and map to version range
 	version := overview.FlinkVersion
-
-	// Simple version mapping - can be enhanced
-	switch {
-	case version >= "2.0.0":
-		return Version2_0Plus, nil
-	case version >= "1.18.0":
-		return Version1_18to1_19, nil
-	case version >= "1.13.0":
-		return Version1_13to1_17, nil
-	case version >= "1.8.0":
-		return Version1_8to1_12, nil
-	default:
-		return Version1_8to1_12, nil // fallback
+	major, minor, err := parseVersion(version)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse Flink version %s: %w", version, err)
 	}
+
+	// Check if version is in supported range [1.18, 2.1]
+	// Version < 1.18: Not supported
+	if major < 1 || (major == 1 && minor < 18) {
+		return "", fmt.Errorf("Flink version %s is not supported (minimum version: 1.18)", version)
+	}
+
+	// Version > 2.1: Not supported
+	if major > 2 || (major == 2 && minor > 1) {
+		return "", fmt.Errorf("Flink version %s is not supported (maximum version: 2.1)", version)
+	}
+
+	// Version is in supported range [1.18, 2.1]
+	// Map to appropriate version constant
+	if major >= 2 {
+		return Version2_0Plus, nil
+	}
+	return Version1_18to1_19, nil
 }

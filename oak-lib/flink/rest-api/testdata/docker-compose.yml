@@ -1,21 +1,19 @@
-version: '3.8'
-
 services:
   jobmanager:
     image: flink:2.1.0-scala_2.12
     container_name: flink-jobmanager-test
     ports:
       - "8081:8081"
-    # Run in Application mode with WordCount example (built-in to the Flink image)
-    command: |
-      bash -c "cp /opt/flink/examples/streaming/WordCount.jar /opt/flink/usrlib/ && \
-      /docker-entrypoint.sh standalone-job --job-classname org.apache.flink.streaming.examples.wordcount.WordCount"
+    # TODO: Switch to Application mode once we have a proper Java-based job JAR
+    # The built-in Flink Scala examples have serialization issues in Application mode
+    # For now, running in Session mode to enable integration testing
+    command: jobmanager
     environment:
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
         rest.port: 8081
-        state.backend: filesystem
+        state.backend: hashmap
         state.checkpoints.dir: file:///tmp/flink-checkpoints
         state.savepoints.dir: file:///tmp/flink-savepoints
         parallelism.default: 2

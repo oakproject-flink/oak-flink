@@ -15,7 +15,7 @@
 //go:build integration
 // +build integration
 
-package flink
+package restapi
 
 import (
 	"context"
@@ -59,6 +59,14 @@ func TestMain(m *testing.M) {
 	}
 
 	fmt.Println("Flink cluster is ready")
+
+	// Start a test job for job-related tests
+	if err := startTestJob(); err != nil {
+		fmt.Printf("Failed to start test job: %v\n", err)
+		printContainerLogs()
+		cleanup(composeFile)
+		os.Exit(1)
+	}
 
 	// Run tests
 	code := m.Run()
@@ -116,6 +124,59 @@ func waitForFlink() error {
 
 	fmt.Println()
 	return fmt.Errorf("timeout waiting for Flink to start after %d attempts", attempts)
+}
+
+func startTestJob() error {
+	// Extract a simple example JAR from the Flink container and upload it
+	fmt.Println("Starting a test job...")
+
+	// Copy the TopSpeedWindowing JAR from the container
+	jarPath := filepath.Join("testdata", "TopSpeedWindowing.jar")
+	cmd := exec.Command("docker", "cp", "flink-jobmanager-test:/opt/flink/examples/streaming/TopSpeedWindowing.jar", jarPath)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to copy JAR from container: %w", err)
+	}
+
+	client := NewClient(flinkURL, WithTimeout(30*time.Second))
+	ctx := context.Background()
+
+	// Upload the JAR
+	fmt.Println("Uploading JAR...")
+	uploadResp, err := client.UploadJar(ctx, jarPath)
+	if err != nil {
+		return fmt.Errorf("failed to upload JAR: %w", err)
+	}
+	fmt.Printf("JAR uploaded: %s\n", uploadResp.Filename)
+
+	// Get the JAR ID from the filename (extract just the basename)
+	jarID := filepath.Base(uploadResp.Filename)
+
+	// Run the JAR
+	fmt.Println("Running job...")
+	runResp, err := client.RunJar(ctx, jarID, JarRunRequest{
+		Parallelism: 1,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run JAR: %w", err)
+	}
+
+	fmt.Printf("Job started with ID: %s\n", runResp.JobID)
+
+	// Wait a bit for the job to actually start
+	time.Sleep(3 * time.Second)
+
+	// Verify the job is running
+	jobs, err := client.ListJobs(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list jobs: %w", err)
+	}
+
+	if len(jobs) == 0 {
+		return fmt.Errorf("job was submitted but is not in the jobs list")
+	}
+
+	fmt.Printf("Job is running (status: %s)\n", jobs[0].Status)
+	return nil
 }
 
 func cleanup(composeFile string) {
@@ -270,4 +331,103 @@ func TestIntegration_ErrorHandling(t *testing.T) {
 	}
 
 	t.Logf("Got expected error for non-existent job: %v", err)
+}
+
+func TestIntegration_JAROperations(t *testing.T) {
+	client := NewClient(flinkURL)
+	ctx := context.Background()
+
+	jarPath := "./testdata/TopSpeedWindowing.jar"
+
+	// Test 1: Upload JAR
+	t.Run("UploadJar", func(t *testing.T) {
+		uploadResp, err := client.UploadJar(ctx, jarPath)
+		if err != nil {
+			t.Fatalf("UploadJar failed: %v", err)
+		}
+
+		if uploadResp.Filename == "" {
+			t.Error("expected filename in upload response")
+		}
+
+		t.Logf("Uploaded JAR: %s (status: %s)", uploadResp.Filename, uploadResp.Status)
+	})
+
+	// Test 2: List JARs
+	var jarID string
+	t.Run("ListJars", func(t *testing.T) {
+		jarsResp, err := client.ListJars(ctx)
+		if err != nil {
+			t.Fatalf("ListJars failed: %v", err)
+		}
+
+		if len(jarsResp.Files) == 0 {
+			t.Fatal("expected at least one JAR in list")
+		}
+
+		// Get the JAR ID for next tests
+		jarID = jarsResp.Files[0].ID
+		t.Logf("Found %d JARs, first JAR ID: %s", len(jarsResp.Files), jarID)
+	})
+
+	// Test 3: Run JAR
+	var jobID string
+	t.Run("RunJar", func(t *testing.T) {
+		if jarID == "" {
+			t.Skip("no JAR ID available from previous test")
+		}
+
+		runReq := JarRunRequest{
+			Parallelism: 1,
+		}
+
+		runResp, err := client.RunJar(ctx, jarID, runReq)
+		if err != nil {
+			t.Fatalf("RunJar failed: %v", err)
+		}
+
+		if runResp.JobID == "" {
+			t.Error("expected job ID in run response")
+		}
+
+		jobID = runResp.JobID
+		t.Logf("Started job from JAR: %s", jobID)
+
+		// Cancel the job after starting to clean up
+		if jobID != "" {
+			time.Sleep(2 * time.Second) // Give job time to start
+			if err := client.CancelJob(ctx, jobID); err != nil {
+				t.Logf("Warning: failed to cancel test job %s: %v", jobID, err)
+			} else {
+				t.Logf("Cancelled test job: %s", jobID)
+			}
+		}
+	})
+
+	// Test 4: Delete JAR
+	t.Run("DeleteJar", func(t *testing.T) {
+		if jarID == "" {
+			t.Skip("no JAR ID available from previous test")
+		}
+
+		err := client.DeleteJar(ctx, jarID)
+		if err != nil {
+			t.Fatalf("DeleteJar failed: %v", err)
+		}
+
+		t.Logf("Deleted JAR: %s", jarID)
+
+		// Verify it's deleted by listing JARs
+		jarsResp, err := client.ListJars(ctx)
+		if err != nil {
+			t.Fatalf("ListJars failed: %v", err)
+		}
+
+		// Check that the JAR is no longer in the list
+		for _, jar := range jarsResp.Files {
+			if jar.ID == jarID {
+				t.Errorf("JAR %s still exists after deletion", jarID)
+			}
+		}
+	})
 }

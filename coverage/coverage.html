@@ -1,0 +1,851 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>rest-api: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/oakproject-flink/oak-flink/oak-lib/flink/rest-api/client.go (96.6%)</option>
+				
+				<option value="file1">github.com/oakproject-flink/oak-flink/oak-lib/flink/rest-api/cluster.go (84.6%)</option>
+				
+				<option value="file2">github.com/oakproject-flink/oak-flink/oak-lib/flink/rest-api/jobs.go (89.3%)</option>
+				
+				<option value="file3">github.com/oakproject-flink/oak-flink/oak-lib/flink/rest-api/jobs_submit.go (76.9%)</option>
+				
+				<option value="file4">github.com/oakproject-flink/oak-flink/oak-lib/flink/rest-api/metrics.go (85.7%)</option>
+				
+				<option value="file5">github.com/oakproject-flink/oak-flink/oak-lib/flink/rest-api/savepoints.go (81.8%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">no coverage</span>
+				<span class="cov1">low coverage</span>
+				<span class="cov2">*</span>
+				<span class="cov3">*</span>
+				<span class="cov4">*</span>
+				<span class="cov5">*</span>
+				<span class="cov6">*</span>
+				<span class="cov7">*</span>
+				<span class="cov8">*</span>
+				<span class="cov9">*</span>
+				<span class="cov10">high coverage</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">// Copyright 2025 Andrei Grigoriu
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package restapi
+
+import (
+        "context"
+        "encoding/json"
+        "fmt"
+        "io"
+        "net/http"
+        "time"
+)
+
+// Client is the main Flink REST API client
+type Client struct {
+        baseURL    string
+        httpClient *http.Client
+        version    Version
+}
+
+// Version represents a Flink version range
+type Version string
+
+const (
+        // Version ranges - group versions with identical REST APIs
+        Version1_8to1_12  Version = "1.8-1.12"   // Flink 1.8 through 1.12
+        Version1_13to1_17 Version = "1.13-1.17"  // Flink 1.13 through 1.17
+        Version1_18to1_19 Version = "1.18-1.19"  // Flink 1.18 through 1.19
+        Version2_0Plus    Version = "2.0+"       // Flink 2.0 and above
+        VersionAuto       Version = "auto"       // Auto-detect version
+)
+
+// NewClient creates a new Flink REST API client
+func NewClient(baseURL string, opts ...Option) *Client <span class="cov10" title="48">{
+        c := &amp;Client{
+                baseURL: baseURL,
+                httpClient: &amp;http.Client{
+                        Timeout: 30 * time.Second,
+                },
+                version: VersionAuto,
+        }
+
+        for _, opt := range opts </span><span class="cov3" title="3">{
+                opt(c)
+        }</span>
+
+        <span class="cov10" title="48">return c</span>
+}
+
+// Option is a functional option for configuring the Client
+type Option func(*Client)
+
+// WithHTTPClient sets a custom HTTP client
+func WithHTTPClient(httpClient *http.Client) Option <span class="cov1" title="1">{
+        return func(c *Client) </span><span class="cov1" title="1">{
+                c.httpClient = httpClient
+        }</span>
+}
+
+// WithVersion sets a specific Flink version range
+func WithVersion(version Version) Option <span class="cov1" title="1">{
+        return func(c *Client) </span><span class="cov1" title="1">{
+                c.version = version
+        }</span>
+}
+
+// WithTimeout sets the HTTP client timeout
+func WithTimeout(timeout time.Duration) Option <span class="cov1" title="1">{
+        return func(c *Client) </span><span class="cov1" title="1">{
+                c.httpClient.Timeout = timeout
+        }</span>
+}
+
+// doRequest executes an HTTP request and handles common error cases
+func (c *Client) doRequest(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) <span class="cov9" title="44">{
+        url := fmt.Sprintf("%s%s", c.baseURL, path)
+
+        req, err := http.NewRequestWithContext(ctx, method, url, body)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to create request: %w", err)
+        }</span>
+
+        <span class="cov9" title="44">req.Header.Set("Accept", "application/json")
+        if body != nil </span><span class="cov5" title="7">{
+                req.Header.Set("Content-Type", "application/json")
+        }</span>
+
+        <span class="cov9" title="44">resp, err := c.httpClient.Do(req)
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("failed to execute request: %w", err)
+        }</span>
+
+        <span class="cov9" title="43">if resp.StatusCode &gt;= 400 </span><span class="cov6" title="13">{
+                defer resp.Body.Close()
+                bodyBytes, _ := io.ReadAll(resp.Body)
+                return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(bodyBytes))
+        }</span>
+
+        <span class="cov8" title="30">return resp, nil</span>
+}
+
+// unmarshalResponse reads and unmarshals a JSON response
+func unmarshalResponse(resp *http.Response, v interface{}) error <span class="cov8" title="29">{
+        defer resp.Body.Close()
+
+        if err := json.NewDecoder(resp.Body).Decode(v); err != nil </span><span class="cov1" title="1">{
+                return fmt.Errorf("failed to decode response: %w", err)
+        }</span>
+
+        <span class="cov8" title="28">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">// Copyright 2025 Andrei Grigoriu
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package restapi
+
+import (
+        "context"
+        "fmt"
+        "strconv"
+        "strings"
+)
+
+// GetClusterOverview returns overview information about the Flink cluster
+// Endpoint: GET /overview
+// Available since: Flink 1.0
+func (c *Client) GetClusterOverview(ctx context.Context) (*ClusterOverview, error) <span class="cov10" title="12">{
+        resp, err := c.doRequest(ctx, "GET", "/overview", nil)
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("failed to get cluster overview: %w", err)
+        }</span>
+
+        <span class="cov9" title="11">var overview ClusterOverview
+        if err := unmarshalResponse(resp, &amp;overview); err != nil </span><span class="cov1" title="1">{
+                return nil, err
+        }</span>
+
+        <span class="cov9" title="10">return &amp;overview, nil</span>
+}
+
+// GetConfig returns the Flink cluster configuration
+// Endpoint: GET /jobmanager/config
+// Available since: Flink 1.2
+func (c *Client) GetConfig(ctx context.Context) (*ConfigResponse, error) <span class="cov4" title="3">{
+        resp, err := c.doRequest(ctx, "GET", "/jobmanager/config", nil)
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("failed to get cluster config: %w", err)
+        }</span>
+
+        <span class="cov3" title="2">var entries []ConfigEntry
+        if err := unmarshalResponse(resp, &amp;entries); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov3" title="2">return &amp;ConfigResponse{Entries: entries}, nil</span>
+}
+
+// parseVersion parses a semantic version string and returns major, minor
+func parseVersion(version string) (major, minor int, err error) <span class="cov8" title="9">{
+        // Remove any prefix like "v" if present
+        version = strings.TrimPrefix(version, "v")
+
+        // Split by dots and parse
+        parts := strings.Split(version, ".")
+        if len(parts) &lt; 2 </span><span class="cov0" title="0">{
+                return 0, 0, fmt.Errorf("invalid version format: %s", version)
+        }</span>
+
+        <span class="cov8" title="9">major, err = strconv.Atoi(parts[0])
+        if err != nil </span><span class="cov0" title="0">{
+                return 0, 0, fmt.Errorf("invalid major version: %w", err)
+        }</span>
+
+        <span class="cov8" title="9">minor, err = strconv.Atoi(parts[1])
+        if err != nil </span><span class="cov0" title="0">{
+                return 0, 0, fmt.Errorf("invalid minor version: %w", err)
+        }</span>
+
+        <span class="cov8" title="9">return major, minor, nil</span>
+}
+
+// DetectVersion attempts to auto-detect the Flink version from the cluster
+// Supported versions: Flink 1.18 through 2.1 (inclusive)
+func (c *Client) DetectVersion(ctx context.Context) (Version, error) <span class="cov8" title="9">{
+        overview, err := c.GetClusterOverview(ctx)
+        if err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to detect version: %w", err)
+        }</span>
+
+        <span class="cov8" title="9">version := overview.FlinkVersion
+        major, minor, err := parseVersion(version)
+        if err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to parse Flink version %s: %w", version, err)
+        }</span>
+
+        // Check if version is in supported range [1.18, 2.1]
+        // Version &lt; 1.18: Not supported
+        <span class="cov8" title="9">if major &lt; 1 || (major == 1 &amp;&amp; minor &lt; 18) </span><span class="cov4" title="3">{
+                return "", fmt.Errorf("Flink version %s is not supported (minimum version: 1.18)", version)
+        }</span>
+
+        // Version &gt; 2.1: Not supported
+        <span class="cov7" title="6">if major &gt; 2 || (major == 2 &amp;&amp; minor &gt; 1) </span><span class="cov3" title="2">{
+                return "", fmt.Errorf("Flink version %s is not supported (maximum version: 2.1)", version)
+        }</span>
+
+        // Version is in supported range [1.18, 2.1]
+        // Map to appropriate version constant
+        <span class="cov6" title="4">if major &gt;= 2 </span><span class="cov3" title="2">{
+                return Version2_0Plus, nil
+        }</span>
+        <span class="cov3" title="2">return Version1_18to1_19, nil</span>
+}</pre>
+		
+		<pre class="file" id="file2" style="display: none">// Copyright 2025 Andrei Grigoriu
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package restapi
+
+import (
+        "context"
+        "fmt"
+)
+
+// ListJobs returns all jobs
+// Endpoint: GET /jobs
+// Available since: Flink 1.0
+func (c *Client) ListJobs(ctx context.Context) ([]Job, error) <span class="cov10" title="4">{
+        resp, err := c.doRequest(ctx, "GET", "/jobs", nil)
+        if err != nil </span><span class="cov5" title="2">{
+                return nil, fmt.Errorf("failed to list jobs: %w", err)
+        }</span>
+
+        <span class="cov5" title="2">var overview JobsOverview
+        if err := unmarshalResponse(resp, &amp;overview); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov5" title="2">return overview.Jobs, nil</span>
+}
+
+// GetJob returns details for a specific job
+// Endpoint: GET /jobs/:jobid
+// Available since: Flink 1.0
+func (c *Client) GetJob(ctx context.Context, jobID string) (*JobDetails, error) <span class="cov5" title="2">{
+        path := fmt.Sprintf("/jobs/%s", jobID)
+
+        resp, err := c.doRequest(ctx, "GET", path, nil)
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("failed to get job %s: %w", jobID, err)
+        }</span>
+
+        <span class="cov1" title="1">var details JobDetails
+        if err := unmarshalResponse(resp, &amp;details); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov1" title="1">return &amp;details, nil</span>
+}
+
+// CancelJob cancels a running job
+// Endpoint: PATCH /jobs/:jobid
+// Available since: Flink 1.0
+func (c *Client) CancelJob(ctx context.Context, jobID string) error <span class="cov5" title="2">{
+        path := fmt.Sprintf("/jobs/%s", jobID)
+
+        _, err := c.doRequest(ctx, "PATCH", path, nil)
+        if err != nil </span><span class="cov1" title="1">{
+                return fmt.Errorf("failed to cancel job %s: %w", jobID, err)
+        }</span>
+
+        <span class="cov1" title="1">return nil</span>
+}
+
+// GetJobConfig returns the configuration of a job
+// Endpoint: GET /jobs/:jobid/config
+// Available since: Flink 1.2
+func (c *Client) GetJobConfig(ctx context.Context, jobID string) (*ConfigResponse, error) <span class="cov5" title="2">{
+        path := fmt.Sprintf("/jobs/%s/config", jobID)
+
+        resp, err := c.doRequest(ctx, "GET", path, nil)
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("failed to get job config for %s: %w", jobID, err)
+        }</span>
+
+        <span class="cov1" title="1">var entries []ConfigEntry
+        if err := unmarshalResponse(resp, &amp;entries); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov1" title="1">return &amp;ConfigResponse{Entries: entries}, nil</span>
+}</pre>
+		
+		<pre class="file" id="file3" style="display: none">// Copyright 2025 Andrei Grigoriu
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package restapi
+
+import (
+        "bytes"
+        "context"
+        "encoding/json"
+        "fmt"
+        "io"
+        "mime/multipart"
+        "net/http"
+        "os"
+        "path/filepath"
+)
+
+// JarUploadResponse represents the response from uploading a JAR
+type JarUploadResponse struct {
+        Filename string `json:"filename"`
+        Status   string `json:"status"`
+}
+
+// JarRunRequest represents a request to run a JAR
+type JarRunRequest struct {
+        // EntryClass is the main class to execute
+        EntryClass string `json:"entryClass,omitempty"`
+        // ProgramArgs are arguments for the program
+        ProgramArgs string `json:"programArgs,omitempty"`
+        // Parallelism for the job
+        Parallelism int `json:"parallelism,omitempty"`
+        // SavepointPath to restore from
+        SavepointPath string `json:"savepointPath,omitempty"`
+        // AllowNonRestoredState allows job to start even if savepoint has extra state
+        AllowNonRestoredState bool `json:"allowNonRestoredState,omitempty"`
+}
+
+// JarRunResponse represents the response from running a JAR
+type JarRunResponse struct {
+        JobID string `json:"jobid"`
+}
+
+// JarsListResponse represents the list of uploaded JARs
+type JarsListResponse struct {
+        Address string      `json:"address"`
+        Files   []JarFile   `json:"files"`
+}
+
+// JarFile represents an uploaded JAR file
+type JarFile struct {
+        ID     string `json:"id"`
+        Name   string `json:"name"`
+        Upload int64  `json:"uploaded"`
+        Entry  []struct {
+                Name        string `json:"name"`
+                Description string `json:"description"`
+        } `json:"entry"`
+}
+
+// UploadJar uploads a JAR file to the Flink cluster
+// Endpoint: POST /jars/upload
+// Available since: Flink 1.0
+func (c *Client) UploadJar(ctx context.Context, jarPath string) (*JarUploadResponse, error) <span class="cov10" title="2">{
+        // Open the JAR file
+        file, err := os.Open(jarPath)
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("failed to open JAR file: %w", err)
+        }</span>
+        <span class="cov1" title="1">defer file.Close()
+
+        // Create multipart form
+        body := &amp;bytes.Buffer{}
+        writer := multipart.NewWriter(body)
+
+        part, err := writer.CreateFormFile("jarfile", filepath.Base(jarPath))
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to create form file: %w", err)
+        }</span>
+
+        <span class="cov1" title="1">if _, err := io.Copy(part, file); err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to copy file: %w", err)
+        }</span>
+
+        <span class="cov1" title="1">contentType := writer.FormDataContentType()
+        writer.Close()
+
+        // Create request manually for multipart upload
+        url := fmt.Sprintf("%s/jars/upload", c.baseURL)
+        req, err := http.NewRequestWithContext(ctx, "POST", url, body)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to create request: %w", err)
+        }</span>
+
+        <span class="cov1" title="1">req.Header.Set("Content-Type", contentType)
+
+        resp, err := c.httpClient.Do(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to upload JAR: %w", err)
+        }</span>
+
+        <span class="cov1" title="1">if resp.StatusCode &gt;= 400 </span><span class="cov0" title="0">{
+                defer resp.Body.Close()
+                bodyBytes, _ := io.ReadAll(resp.Body)
+                return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(bodyBytes))
+        }</span>
+
+        <span class="cov1" title="1">var uploadResp JarUploadResponse
+        if err := unmarshalResponse(resp, &amp;uploadResp); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov1" title="1">return &amp;uploadResp, nil</span>
+}
+
+// ListJars lists all uploaded JARs
+// Endpoint: GET /jars
+// Available since: Flink 1.0
+func (c *Client) ListJars(ctx context.Context) (*JarsListResponse, error) <span class="cov10" title="2">{
+        resp, err := c.doRequest(ctx, "GET", "/jars", nil)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to list JARs: %w", err)
+        }</span>
+
+        <span class="cov10" title="2">var jarsResp JarsListResponse
+        if err := unmarshalResponse(resp, &amp;jarsResp); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov10" title="2">return &amp;jarsResp, nil</span>
+}
+
+// RunJar runs an uploaded JAR file
+// Endpoint: POST /jars/:jarid/run
+// Available since: Flink 1.0
+func (c *Client) RunJar(ctx context.Context, jarID string, req JarRunRequest) (*JarRunResponse, error) <span class="cov10" title="2">{
+        path := fmt.Sprintf("/jars/%s/run", jarID)
+
+        body, err := json.Marshal(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to marshal run request: %w", err)
+        }</span>
+
+        <span class="cov10" title="2">resp, err := c.doRequest(ctx, "POST", path, bytes.NewReader(body))
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("failed to run JAR %s: %w", jarID, err)
+        }</span>
+
+        <span class="cov1" title="1">var runResp JarRunResponse
+        if err := unmarshalResponse(resp, &amp;runResp); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov1" title="1">return &amp;runResp, nil</span>
+}
+
+// DeleteJar deletes an uploaded JAR file
+// Endpoint: DELETE /jars/:jarid
+// Available since: Flink 1.0
+func (c *Client) DeleteJar(ctx context.Context, jarID string) error <span class="cov10" title="2">{
+        path := fmt.Sprintf("/jars/%s", jarID)
+
+        _, err := c.doRequest(ctx, "DELETE", path, nil)
+        if err != nil </span><span class="cov1" title="1">{
+                return fmt.Errorf("failed to delete JAR %s: %w", jarID, err)
+        }</span>
+
+        <span class="cov1" title="1">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">// Copyright 2025 Andrei Grigoriu
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package restapi
+
+import (
+        "context"
+        "fmt"
+        "strconv"
+        "strings"
+)
+
+// GetJobMetrics retrieves metrics for a specific job
+// Endpoint: GET /jobs/:jobid/metrics
+// Available since: Flink 1.0
+// You can filter metrics by providing metric names in the query parameter
+func (c *Client) GetJobMetrics(ctx context.Context, jobID string, metricNames ...string) (*JobMetrics, error) <span class="cov10" title="3">{
+        path := fmt.Sprintf("/jobs/%s/metrics", jobID)
+
+        // Add metric filter if provided
+        if len(metricNames) &gt; 0 </span><span class="cov0" title="0">{
+                path = fmt.Sprintf("%s?get=%s", path, strings.Join(metricNames, ","))
+        }</span>
+
+        <span class="cov10" title="3">resp, err := c.doRequest(ctx, "GET", path, nil)
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("failed to get metrics for job %s: %w", jobID, err)
+        }</span>
+
+        <span class="cov6" title="2">var metricResp []Metric
+        if err := unmarshalResponse(resp, &amp;metricResp); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        // Convert to JobMetrics
+        <span class="cov6" title="2">metrics := &amp;JobMetrics{
+                JobID:   jobID,
+                Metrics: make(map[string]float64),
+        }
+
+        for _, m := range metricResp </span><span class="cov10" title="3">{
+                // Try to parse metric value as float
+                if val, err := strconv.ParseFloat(m.Value, 64); err == nil </span><span class="cov10" title="3">{
+                        metrics.Metrics[m.ID] = val
+                }</span>
+        }
+
+        <span class="cov6" title="2">return metrics, nil</span>
+}
+
+// GetVertexMetrics retrieves metrics for a specific job vertex (operator)
+// Endpoint: GET /jobs/:jobid/vertices/:vertexid/metrics
+// Available since: Flink 1.0
+func (c *Client) GetVertexMetrics(ctx context.Context, jobID, vertexID string, metricNames ...string) (map[string]float64, error) <span class="cov6" title="2">{
+        path := fmt.Sprintf("/jobs/%s/vertices/%s/metrics", jobID, vertexID)
+
+        // Add metric filter if provided
+        if len(metricNames) &gt; 0 </span><span class="cov0" title="0">{
+                path = fmt.Sprintf("%s?get=%s", path, strings.Join(metricNames, ","))
+        }</span>
+
+        <span class="cov6" title="2">resp, err := c.doRequest(ctx, "GET", path, nil)
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("failed to get metrics for vertex %s in job %s: %w", vertexID, jobID, err)
+        }</span>
+
+        <span class="cov1" title="1">var metricResp []Metric
+        if err := unmarshalResponse(resp, &amp;metricResp); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        // Convert to map
+        <span class="cov1" title="1">metrics := make(map[string]float64)
+        for _, m := range metricResp </span><span class="cov6" title="2">{
+                if val, err := strconv.ParseFloat(m.Value, 64); err == nil </span><span class="cov6" title="2">{
+                        metrics[m.ID] = val
+                }</span>
+        }
+
+        <span class="cov1" title="1">return metrics, nil</span>
+}
+
+// Common metric names for convenience
+const (
+        // Job-level metrics
+        MetricNumRecordsIn          = "numRecordsIn"
+        MetricNumRecordsOut         = "numRecordsOut"
+        MetricNumBytesIn            = "numBytesIn"
+        MetricNumBytesOut           = "numBytesOut"
+        MetricBackPressuredTime     = "backPressuredTimeMsPerSecond"
+        MetricIdleTime              = "idleTimeMsPerSecond"
+        MetricBusyTime              = "busyTimeMsPerSecond"
+        MetricLastCheckpointDuration = "lastCheckpointDuration"
+        MetricLastCheckpointSize    = "lastCheckpointSize"
+
+        // Vertex-level metrics
+        MetricNumRecordsInPerSecond  = "numRecordsInPerSecond"
+        MetricNumRecordsOutPerSecond = "numRecordsOutPerSecond"
+)</pre>
+		
+		<pre class="file" id="file5" style="display: none">// Copyright 2025 Andrei Grigoriu
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package restapi
+
+import (
+        "bytes"
+        "context"
+        "encoding/json"
+        "fmt"
+)
+
+// TriggerSavepoint triggers a savepoint for a job
+// Endpoint: POST /jobs/:jobid/savepoints
+// Available since: Flink 1.2
+func (c *Client) TriggerSavepoint(ctx context.Context, jobID string, req SavepointTriggerRequest) (*SavepointTriggerResponse, error) <span class="cov10" title="3">{
+        path := fmt.Sprintf("/jobs/%s/savepoints", jobID)
+
+        body, err := json.Marshal(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to marshal savepoint request: %w", err)
+        }</span>
+
+        <span class="cov10" title="3">resp, err := c.doRequest(ctx, "POST", path, bytes.NewReader(body))
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("failed to trigger savepoint for job %s: %w", jobID, err)
+        }</span>
+
+        <span class="cov6" title="2">var savepointResp SavepointTriggerResponse
+        if err := unmarshalResponse(resp, &amp;savepointResp); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov6" title="2">return &amp;savepointResp, nil</span>
+}
+
+// GetSavepointStatus retrieves the status of a savepoint operation
+// Endpoint: GET /jobs/:jobid/savepoints/:triggerid
+// Available since: Flink 1.2
+func (c *Client) GetSavepointStatus(ctx context.Context, jobID, triggerID string) (*SavepointStatus, error) <span class="cov10" title="3">{
+        path := fmt.Sprintf("/jobs/%s/savepoints/%s", jobID, triggerID)
+
+        resp, err := c.doRequest(ctx, "GET", path, nil)
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("failed to get savepoint status for job %s, trigger %s: %w", jobID, triggerID, err)
+        }</span>
+
+        <span class="cov6" title="2">var status SavepointStatus
+        if err := unmarshalResponse(resp, &amp;status); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov6" title="2">return &amp;status, nil</span>
+}
+
+// StopJobWithSavepoint stops a job with a savepoint
+// This is a version-specific implementation
+// Endpoint: POST /jobs/:jobid/stop (Flink 1.11+)
+func (c *Client) StopJobWithSavepoint(ctx context.Context, jobID string, targetDirectory string) (*SavepointTriggerResponse, error) <span class="cov6" title="2">{
+        // Use different endpoints based on version
+        switch c.version </span>{
+        case Version1_8to1_12:<span class="cov0" title="0">
+                // Older versions: use trigger savepoint with cancel flag
+                return c.TriggerSavepoint(ctx, jobID, SavepointTriggerRequest{
+                        TargetDirectory: targetDirectory,
+                        CancelJob:       true,
+                })</span>
+        default:<span class="cov6" title="2">
+                // Flink 1.11+ has dedicated stop endpoint
+                path := fmt.Sprintf("/jobs/%s/stop", jobID)
+
+                req := struct {
+                        TargetDirectory string `json:"targetDirectory"`
+                        Drain           bool   `json:"drain"`
+                }{
+                        TargetDirectory: targetDirectory,
+                        Drain:           false,
+                }
+
+                body, err := json.Marshal(req)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("failed to marshal stop request: %w", err)
+                }</span>
+
+                <span class="cov6" title="2">resp, err := c.doRequest(ctx, "POST", path, bytes.NewReader(body))
+                if err != nil </span><span class="cov1" title="1">{
+                        return nil, fmt.Errorf("failed to stop job %s with savepoint: %w", jobID, err)
+                }</span>
+
+                <span class="cov1" title="1">var savepointResp SavepointTriggerResponse
+                if err := unmarshalResponse(resp, &amp;savepointResp); err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+
+                <span class="cov1" title="1">return &amp;savepointResp, nil</span>
+        }
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

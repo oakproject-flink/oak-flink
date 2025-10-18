@@ -15,7 +15,7 @@
 //go:build integration
 // +build integration
 
-package flink
+package restapi
 
 import (
 	"context"
@@ -27,14 +27,14 @@ func TestIntegration_RunningJob(t *testing.T) {
 	client := NewClient(flinkURL)
 	ctx := context.Background()
 
-	// List jobs - should have the WordCount example running
+	// List jobs - should have the test job we started in TestMain
 	jobs, err := client.ListJobs(ctx)
 	if err != nil {
 		t.Fatalf("ListJobs failed: %v", err)
 	}
 
 	if len(jobs) == 0 {
-		t.Fatal("expected at least 1 running job (WordCount example)")
+		t.Fatal("expected at least 1 running job (test job started in setup)")
 	}
 
 	t.Logf("Found %d job(s)", len(jobs))
