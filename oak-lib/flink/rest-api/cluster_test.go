@@ -74,7 +74,12 @@ func TestGetClusterOverview(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewClient(server.URL)
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient failed: %v", err)
+			}
+			defer client.Close()
+
 			ctx := context.Background()
 
 			overview, err := client.GetClusterOverview(ctx)
@@ -141,7 +146,12 @@ func TestGetConfig(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewClient(server.URL)
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient failed: %v", err)
+			}
+			defer client.Close()
+
 			ctx := context.Background()
 
 			config, err := client.GetConfig(ctx)
@@ -232,7 +242,12 @@ func TestDetectVersion(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewClient(server.URL)
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient failed: %v", err)
+			}
+			defer client.Close()
+
 			ctx := context.Background()
 
 			version, err := client.DetectVersion(ctx)

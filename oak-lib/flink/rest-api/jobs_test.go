@@ -67,7 +67,12 @@ func TestListJobs(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewClient(server.URL)
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient failed: %v", err)
+			}
+			defer client.Close()
+
 			ctx := context.Background()
 
 			jobs, err := client.ListJobs(ctx)
@@ -130,7 +135,12 @@ func TestGetJob(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewClient(server.URL)
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient failed: %v", err)
+			}
+			defer client.Close()
+
 			ctx := context.Background()
 
 			job, err := client.GetJob(ctx, tt.jobID)
@@ -187,10 +197,15 @@ func TestCancelJob(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewClient(server.URL)
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient failed: %v", err)
+			}
+			defer client.Close()
+
 			ctx := context.Background()
 
-			err := client.CancelJob(ctx, tt.jobID)
+			err = client.CancelJob(ctx, tt.jobID)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CancelJob() error = %v, wantErr %v", err, tt.wantErr)
@@ -240,7 +255,12 @@ func TestGetJobConfig(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewClient(server.URL)
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient failed: %v", err)
+			}
+			defer client.Close()
+
 			ctx := context.Background()
 
 			config, err := client.GetJobConfig(ctx, tt.jobID)

@@ -95,7 +95,12 @@ func TestTriggerSavepoint(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewClient(server.URL)
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient failed: %v", err)
+			}
+			defer client.Close()
+
 			ctx := context.Background()
 
 			resp, err := client.TriggerSavepoint(ctx, tt.jobID, tt.request)
@@ -168,7 +173,12 @@ func TestGetSavepointStatus(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewClient(server.URL)
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient failed: %v", err)
+			}
+			defer client.Close()
+
 			ctx := context.Background()
 
 			status, err := client.GetSavepointStatus(ctx, tt.jobID, tt.triggerID)
@@ -229,7 +239,12 @@ func TestStopJobWithSavepoint(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewClient(server.URL)
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient failed: %v", err)
+			}
+			defer client.Close()
+
 			ctx := context.Background()
 
 			resp, err := client.StopJobWithSavepoint(ctx, tt.jobID, tt.targetDirectory)

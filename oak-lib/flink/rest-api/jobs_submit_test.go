@@ -65,9 +65,14 @@ func TestUploadJar(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.name == "file not found" {
 				// Skip server setup for file not found test
-				client := NewClient("http://localhost:8081")
+				client, err := NewClient("http://localhost:8081")
+				if err != nil {
+					t.Fatalf("NewClient failed: %v", err)
+				}
+				defer client.Close()
+
 				ctx := context.Background()
-				_, err := client.UploadJar(ctx, tt.jarPath)
+				_, err = client.UploadJar(ctx, tt.jarPath)
 				if err == nil {
 					t.Error("expected error for non-existent file")
 				}
@@ -92,7 +97,12 @@ func TestUploadJar(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewClient(server.URL)
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient failed: %v", err)
+			}
+			defer client.Close()
+
 			ctx := context.Background()
 
 			resp, err := client.UploadJar(ctx, tt.jarPath)
@@ -150,7 +160,12 @@ func TestListJars(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewClient(server.URL)
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient failed: %v", err)
+			}
+			defer client.Close()
+
 			ctx := context.Background()
 
 			jars, err := client.ListJars(ctx)
@@ -227,7 +242,12 @@ func TestRunJar(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewClient(server.URL)
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient failed: %v", err)
+			}
+			defer client.Close()
+
 			ctx := context.Background()
 
 			resp, err := client.RunJar(ctx, tt.jarID, tt.request)
@@ -279,10 +299,15 @@ func TestDeleteJar(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewClient(server.URL)
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient failed: %v", err)
+			}
+			defer client.Close()
+
 			ctx := context.Background()
 
-			err := client.DeleteJar(ctx, tt.jarID)
+			err = client.DeleteJar(ctx, tt.jarID)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DeleteJar() error = %v, wantErr %v", err, tt.wantErr)

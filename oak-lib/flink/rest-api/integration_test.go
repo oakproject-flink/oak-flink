@@ -98,7 +98,12 @@ func printContainerLogs() {
 }
 
 func waitForFlink() error {
-	client := NewClient(flinkURL, WithTimeout(5*time.Second))
+	client, err := NewClient(flinkURL, WithTimeout(5*time.Second))
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+	defer client.Close()
+
 	ctx := context.Background()
 
 	fmt.Print("Waiting for Flink to be ready")
@@ -137,7 +142,12 @@ func startTestJob() error {
 		return fmt.Errorf("failed to copy JAR from container: %w", err)
 	}
 
-	client := NewClient(flinkURL, WithTimeout(30*time.Second))
+	client, err := NewClient(flinkURL, WithTimeout(30*time.Second))
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+	defer client.Close()
+
 	ctx := context.Background()
 
 	// Upload the JAR
@@ -186,7 +196,12 @@ func cleanup(composeFile string) {
 }
 
 func TestIntegration_GetClusterOverview(t *testing.T) {
-	client := NewClient(flinkURL)
+	client, err := NewClient(flinkURL)
+	if err != nil {
+		t.Fatalf("NewClient failed: %v", err)
+	}
+	defer client.Close()
+
 	ctx := context.Background()
 
 	overview, err := client.GetClusterOverview(ctx)
@@ -215,7 +230,12 @@ func TestIntegration_GetClusterOverview(t *testing.T) {
 }
 
 func TestIntegration_DetectVersion(t *testing.T) {
-	client := NewClient(flinkURL)
+	client, err := NewClient(flinkURL)
+	if err != nil {
+		t.Fatalf("NewClient failed: %v", err)
+	}
+	defer client.Close()
+
 	ctx := context.Background()
 
 	version, err := client.DetectVersion(ctx)
@@ -232,7 +252,12 @@ func TestIntegration_DetectVersion(t *testing.T) {
 }
 
 func TestIntegration_GetConfig(t *testing.T) {
-	client := NewClient(flinkURL)
+	client, err := NewClient(flinkURL)
+	if err != nil {
+		t.Fatalf("NewClient failed: %v", err)
+	}
+	defer client.Close()
+
 	ctx := context.Background()
 
 	config, err := client.GetConfig(ctx)
@@ -260,7 +285,12 @@ func TestIntegration_GetConfig(t *testing.T) {
 }
 
 func TestIntegration_ListJobs(t *testing.T) {
-	client := NewClient(flinkURL)
+	client, err := NewClient(flinkURL)
+	if err != nil {
+		t.Fatalf("NewClient failed: %v", err)
+	}
+	defer client.Close()
+
 	ctx := context.Background()
 
 	jobs, err := client.ListJobs(ctx)
@@ -278,7 +308,11 @@ func TestIntegration_ListJobs(t *testing.T) {
 }
 
 func TestIntegration_ContextCancellation(t *testing.T) {
-	client := NewClient(flinkURL)
+	client, err := NewClient(flinkURL)
+	if err != nil {
+		t.Fatalf("NewClient failed: %v", err)
+	}
+	defer client.Close()
 
 	// Create context with immediate timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
@@ -287,7 +321,7 @@ func TestIntegration_ContextCancellation(t *testing.T) {
 	// Wait a bit to ensure context is cancelled
 	time.Sleep(10 * time.Millisecond)
 
-	_, err := client.GetClusterOverview(ctx)
+	_, err = client.GetClusterOverview(ctx)
 	if err == nil {
 		t.Error("expected error due to context cancellation, got nil")
 	}
@@ -296,7 +330,12 @@ func TestIntegration_ContextCancellation(t *testing.T) {
 }
 
 func TestIntegration_ConcurrentRequests(t *testing.T) {
-	client := NewClient(flinkURL)
+	client, err := NewClient(flinkURL)
+	if err != nil {
+		t.Fatalf("NewClient failed: %v", err)
+	}
+	defer client.Close()
+
 	ctx := context.Background()
 
 	// Make multiple concurrent requests
@@ -321,11 +360,16 @@ func TestIntegration_ConcurrentRequests(t *testing.T) {
 }
 
 func TestIntegration_ErrorHandling(t *testing.T) {
-	client := NewClient(flinkURL)
+	client, err := NewClient(flinkURL)
+	if err != nil {
+		t.Fatalf("NewClient failed: %v", err)
+	}
+	defer client.Close()
+
 	ctx := context.Background()
 
 	// Try to get a non-existent job
-	_, err := client.GetJob(ctx, "non-existent-job-id")
+	_, err = client.GetJob(ctx, "non-existent-job-id")
 	if err == nil {
 		t.Error("expected error for non-existent job, got nil")
 	}
@@ -334,7 +378,12 @@ func TestIntegration_ErrorHandling(t *testing.T) {
 }
 
 func TestIntegration_JAROperations(t *testing.T) {
-	client := NewClient(flinkURL)
+	client, err := NewClient(flinkURL)
+	if err != nil {
+		t.Fatalf("NewClient failed: %v", err)
+	}
+	defer client.Close()
+
 	ctx := context.Background()
 
 	jarPath := "./testdata/TopSpeedWindowing.jar"

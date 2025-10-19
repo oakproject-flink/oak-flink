@@ -79,9 +79,15 @@ func parseVersion(version string) (major, minor int, err error) {
 	return major, minor, nil
 }
 
-// DetectVersion attempts to auto-detect the Flink version from the cluster
+// DetectVersion attempts to auto-detect the Flink version from the cluster.
+// The detected version is cached to avoid redundant API calls.
 // Supported versions: Flink 1.18 through 2.1 (inclusive)
 func (c *Client) DetectVersion(ctx context.Context) (Version, error) {
+	// Return cached version if available
+	if c.detectedVersion != nil {
+		return *c.detectedVersion, nil
+	}
+
 	overview, err := c.GetClusterOverview(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to detect version: %w", err)
@@ -105,9 +111,14 @@ func (c *Client) DetectVersion(ctx context.Context) (Version, error) {
 	}
 
 	// Version is in supported range [1.18, 2.1]
-	// Map to appropriate version constant
+	// Map to appropriate version constant and cache it
+	var detected Version
 	if major >= 2 {
-		return Version2_0Plus, nil
+		detected = Version2_0Plus
+	} else {
+		detected = Version1_18to1_19
 	}
-	return Version1_18to1_19, nil
+
+	c.detectedVersion = &detected
+	return detected, nil
 }

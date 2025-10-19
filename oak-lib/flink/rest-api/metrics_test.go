@@ -71,7 +71,12 @@ func TestGetJobMetrics(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewClient(server.URL)
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient failed: %v", err)
+			}
+			defer client.Close()
+
 			ctx := context.Background()
 
 			metrics, err := client.GetJobMetrics(ctx, tt.jobID)
@@ -137,7 +142,12 @@ func TestGetVertexMetrics(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewClient(server.URL)
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient failed: %v", err)
+			}
+			defer client.Close()
+
 			ctx := context.Background()
 
 			metrics, err := client.GetVertexMetrics(ctx, tt.jobID, tt.vertexID)

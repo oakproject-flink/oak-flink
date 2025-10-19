@@ -65,44 +65,33 @@ func (c *Client) GetSavepointStatus(ctx context.Context, jobID, triggerID string
 }
 
 // StopJobWithSavepoint stops a job with a savepoint
-// This is a version-specific implementation
 // Endpoint: POST /jobs/:jobid/stop (Flink 1.11+)
+// Note: All supported versions (1.18+) have this endpoint
 func (c *Client) StopJobWithSavepoint(ctx context.Context, jobID string, targetDirectory string) (*SavepointTriggerResponse, error) {
-	// Use different endpoints based on version
-	switch c.version {
-	case Version1_8to1_12:
-		// Older versions: use trigger savepoint with cancel flag
-		return c.TriggerSavepoint(ctx, jobID, SavepointTriggerRequest{
-			TargetDirectory: targetDirectory,
-			CancelJob:       true,
-		})
-	default:
-		// Flink 1.11+ has dedicated stop endpoint
-		path := fmt.Sprintf("/jobs/%s/stop", jobID)
+	path := fmt.Sprintf("/jobs/%s/stop", jobID)
 
-		req := struct {
-			TargetDirectory string `json:"targetDirectory"`
-			Drain           bool   `json:"drain"`
-		}{
-			TargetDirectory: targetDirectory,
-			Drain:           false,
-		}
-
-		body, err := json.Marshal(req)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal stop request: %w", err)
-		}
-
-		resp, err := c.doRequest(ctx, "POST", path, bytes.NewReader(body))
-		if err != nil {
-			return nil, fmt.Errorf("failed to stop job %s with savepoint: %w", jobID, err)
-		}
-
-		var savepointResp SavepointTriggerResponse
-		if err := unmarshalResponse(resp, &savepointResp); err != nil {
-			return nil, err
-		}
-
-		return &savepointResp, nil
+	req := struct {
+		TargetDirectory string `json:"targetDirectory"`
+		Drain           bool   `json:"drain"`
+	}{
+		TargetDirectory: targetDirectory,
+		Drain:           false,
 	}
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal stop request: %w", err)
+	}
+
+	resp, err := c.doRequest(ctx, "POST", path, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to stop job %s with savepoint: %w", jobID, err)
+	}
+
+	var savepointResp SavepointTriggerResponse
+	if err := unmarshalResponse(resp, &savepointResp); err != nil {
+		return nil, err
+	}
+
+	return &savepointResp, nil
 }

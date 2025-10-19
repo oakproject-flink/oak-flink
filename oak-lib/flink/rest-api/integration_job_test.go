@@ -24,7 +24,12 @@ import (
 )
 
 func TestIntegration_RunningJob(t *testing.T) {
-	client := NewClient(flinkURL)
+	client, err := NewClient(flinkURL)
+	if err != nil {
+		t.Fatalf("NewClient failed: %v", err)
+	}
+	defer client.Close()
+
 	ctx := context.Background()
 
 	// List jobs - should have the test job we started in TestMain
@@ -63,7 +68,12 @@ func TestIntegration_RunningJob(t *testing.T) {
 }
 
 func TestIntegration_JobMetrics(t *testing.T) {
-	client := NewClient(flinkURL)
+	client, err := NewClient(flinkURL)
+	if err != nil {
+		t.Fatalf("NewClient failed: %v", err)
+	}
+	defer client.Close()
+
 	ctx := context.Background()
 
 	// Get running jobs
@@ -93,7 +103,12 @@ func TestIntegration_JobMetrics(t *testing.T) {
 }
 
 func TestIntegration_TriggerSavepoint(t *testing.T) {
-	client := NewClient(flinkURL)
+	client, err := NewClient(flinkURL)
+	if err != nil {
+		t.Fatalf("NewClient failed: %v", err)
+	}
+	defer client.Close()
+
 	ctx := context.Background()
 
 	// Get running jobs
@@ -151,7 +166,12 @@ func TestIntegration_TriggerSavepoint(t *testing.T) {
 func TestIntegration_CancelJob(t *testing.T) {
 	// Note: This test will cancel the running WordCount job
 	// It should be run last
-	client := NewClient(flinkURL)
+	client, err := NewClient(flinkURL)
+	if err != nil {
+		t.Fatalf("NewClient failed: %v", err)
+	}
+	defer client.Close()
+
 	ctx := context.Background()
 
 	// Get running jobs

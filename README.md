@@ -63,6 +63,20 @@ Project is in initial development:
 - [ ] Web UI
 - [ ] Database schema
 
+### Flink REST API Client - Planned Features
+
+Security features to be implemented (see [Flink Security SSL Documentation](https://nightlies.apache.org/flink/flink-docs-release-2.1/docs/deployment/security/security-ssl/)):
+
+- [ ] **SSL/TLS Support**
+  - [ ] `WithTLSConfig(tlsConfig *tls.Config)` option
+  - [ ] Mutual TLS (mTLS) authentication
+  - [ ] Certificate validation
+  - [ ] Custom CA certificates
+- [ ] **Authentication**
+  - [ ] Basic authentication (username/password)
+  - [ ] Token-based authentication
+  - [ ] Custom authentication headers
+
 ## Development
 
 ### Prerequisites
