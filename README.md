@@ -111,11 +111,14 @@ The Oak project includes comprehensive test suites with automated scripts that w
 REM Run unit tests (fast, no Docker required)
 scripts\test-unit.bat
 
-REM Run integration tests (requires Docker)
+REM Run integration tests (requires Docker, Flink 2.1)
 scripts\test-integration.bat
 
-REM Run all tests
+REM Run all tests (unit + integration)
 scripts\test-all.bat
+
+REM Test against ALL Flink versions 1.18-2.1 (10-15 min)
+scripts\test-all-flink-versions.bat
 
 REM Run tests with coverage report
 scripts\test-coverage.bat
@@ -126,11 +129,14 @@ scripts\test-coverage.bat
 # Run unit tests (fast, no Docker required)
 bash scripts/test-unit.sh
 
-# Run integration tests (requires Docker)
+# Run integration tests (requires Docker, Flink 2.1)
 bash scripts/test-integration.sh
 
-# Run all tests
+# Run all tests (unit + integration)
 bash scripts/test-all.sh
+
+# Test against ALL Flink versions 1.18-2.1 (10-15 min)
+bash scripts/test-all-flink-versions.sh
 
 # Run tests with coverage report
 bash scripts/test-coverage.sh
@@ -140,12 +146,13 @@ bash scripts/test-coverage.sh
 
 All test scripts are located in the `scripts/` directory and available in both `.bat` (Windows) and `.sh` (Unix) formats:
 
-| Script | Description | Requirements |
-|--------|-------------|--------------|
-| `test-unit` | Run all unit tests across modules | Go 1.21+ |
-| `test-integration` | Run integration tests with real Flink cluster | Docker |
-| `test-all` | Run both unit and integration tests | Docker |
-| `test-coverage` | Generate HTML coverage report | Go 1.21+ |
+| Script | Description | Requirements | Duration |
+|--------|-------------|--------------|----------|
+| `test-unit` | Run all unit tests across modules | Go 1.21+ | ~15s |
+| `test-integration` | Run integration tests with Flink 2.1 | Docker | ~30s |
+| `test-all` | Run both unit and integration tests | Docker | ~45s |
+| `test-all-flink-versions` | **Test against ALL Flink versions (1.18-2.1)** | Docker | **10-15 min** |
+| `test-coverage` | Generate HTML coverage report | Go 1.21+ | ~15s |
 
 ### Manual Testing
 
@@ -163,12 +170,15 @@ go test -short -v ./oak-lib/...
 
 **Integration tests:**
 ```bash
-# Run integration tests (requires Docker)
+# Run integration tests against Flink 2.1 (requires Docker)
 cd oak-lib/flink/rest-api
 go test -tags=integration -v -timeout 10m
 
 # Run specific integration test
 go test -tags=integration -v -run TestIntegration_JAROperations
+
+# Test against ALL Flink versions 1.18-2.1 (10-15 minutes)
+go test -tags=integration_versions -v -timeout 30m
 ```
 
 **Coverage:**
@@ -198,6 +208,34 @@ Integration tests for the Flink REST API client:
 
 **Note on Test Caching:**
 Integration tests use `-count=1` flag to disable Go's test caching, ensuring fresh Docker container startup every time. Unit tests use caching for faster execution.
+
+### Multi-Version Integration Tests
+
+The `test-all-flink-versions` suite tests the REST API client against **all supported Flink versions sequentially**:
+
+**Supported Versions:**
+- ✅ Flink 1.18.1 (API version: 1.18-1.19)
+- ✅ Flink 1.19.1 (API version: 1.18-1.19)
+- ✅ Flink 1.20.0 (API version: 2.0+)
+- ✅ Flink 2.0.1 (API version: 2.0+)
+- ✅ Flink 2.1.0 (API version: 2.0+)
+
+**What it does:**
+- Starts each Flink version in Docker sequentially
+- Runs comprehensive test suite for each version:
+  - Cluster overview and configuration
+  - Version detection and API compatibility
+  - Job management (list, get, cancel)
+  - JAR operations (upload, run, delete)
+  - Error handling
+- Automatically cleans up containers after each version
+- Takes ~10-15 minutes total (2-3 min per version)
+
+**Use cases:**
+- Verify compatibility across all supported Flink versions
+- Test API changes between versions
+- Ensure version detection works correctly
+- Run before releases to validate multi-version support
 
 ### Test Coverage
 
