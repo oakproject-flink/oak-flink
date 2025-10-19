@@ -112,8 +112,9 @@ func (c *Client) DetectVersion(ctx context.Context) (Version, error) {
 
 	// Version is in supported range [1.18, 2.1]
 	// Map to appropriate version constant and cache it
+	// Note: Flink 1.20+ uses the same REST API as 2.0+
 	var detected Version
-	if major >= 2 {
+	if major >= 2 || (major == 1 && minor >= 20) {
 		detected = Version2_0Plus
 	} else {
 		detected = Version1_18to1_19

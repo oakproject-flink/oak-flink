@@ -1,6 +1,6 @@
 services:
   jobmanager:
-    image: flink:2.0.1-scala_2.12
+    image: flink:2.0.0-scala_2.12
     container_name: flink-jobmanager-test
     ports:
       - "8081:8081"
@@ -22,7 +22,7 @@ services:
       start_period: 15s
 
   taskmanager:
-    image: flink:2.0.1-scala_2.12
+    image: flink:2.0.0-scala_2.12
     container_name: flink-taskmanager-test
     depends_on:
       jobmanager:

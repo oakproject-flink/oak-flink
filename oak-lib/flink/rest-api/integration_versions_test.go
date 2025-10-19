@@ -38,7 +38,7 @@ var supportedVersions = []FlinkVersion{
 	{Version: "1.18.1", ComposeFile: "docker-compose-1.18.yml", ExpectedAPIVersion: Version1_18to1_19},
 	{Version: "1.19.1", ComposeFile: "docker-compose-1.19.yml", ExpectedAPIVersion: Version1_18to1_19},
 	{Version: "1.20.0", ComposeFile: "docker-compose-1.20.yml", ExpectedAPIVersion: Version2_0Plus},
-	{Version: "2.0.1", ComposeFile: "docker-compose-2.0.yml", ExpectedAPIVersion: Version2_0Plus},
+	{Version: "2.0.0", ComposeFile: "docker-compose-2.0.yml", ExpectedAPIVersion: Version2_0Plus},
 	{Version: "2.1.0", ComposeFile: "docker-compose-2.1.yml", ExpectedAPIVersion: Version2_0Plus},
 }
 
@@ -65,6 +65,11 @@ func TestAllFlinkVersions(t *testing.T) {
 			}
 
 			t.Logf("✓ Flink %s cluster is ready", fv.Version)
+
+			// Wait for TaskManager to register (can take a few seconds)
+			if err := waitForTaskManager(t, fv.Version); err != nil {
+				t.Logf("Warning: TaskManager may not have fully registered: %v", err)
+			}
 
 			// Run test suite
 			runVersionTestSuite(t, fv)
@@ -118,6 +123,32 @@ func waitForFlinkReady(t *testing.T, version string) error {
 	}
 
 	return fmt.Errorf("timeout after %d attempts", attempts)
+}
+
+// waitForTaskManager waits for at least one TaskManager to register
+func waitForTaskManager(t *testing.T, version string) error {
+	client, err := NewClient(versionTestFlinkURL, WithTimeout(5*time.Second))
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+	defer client.Close()
+
+	ctx := context.Background()
+	deadline := time.Now().Add(30 * time.Second)
+	attempts := 0
+
+	for time.Now().Before(deadline) {
+		attempts++
+		overview, err := client.GetClusterOverview(ctx)
+		if err == nil && overview.TaskManagers >= 1 {
+			t.Logf("  TaskManager registered after %d attempts", attempts)
+			return nil
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+
+	return fmt.Errorf("timeout waiting for TaskManager after %d attempts", attempts)
 }
 
 // runVersionTestSuite runs the core tests for a specific Flink version
@@ -191,8 +222,10 @@ func runVersionTestSuite(t *testing.T, fv FlinkVersion) {
 		t.Logf("  Jobs found: %d", len(jobs))
 	})
 
-	// Test 5: JAR Operations
-	t.Run("JAROperations", func(t *testing.T) {
+	// Test 5: JAR Upload & List
+	var testJobID string
+	var testJarID string
+	t.Run("JARUploadAndList", func(t *testing.T) {
 		// Copy example JAR from container
 		jarPath := filepath.Join("testdata", "TopSpeedWindowing.jar")
 		cmd := exec.Command("docker", "cp", "flink-jobmanager-test:/opt/flink/examples/streaming/TopSpeedWindowing.jar", jarPath)
@@ -206,41 +239,186 @@ func runVersionTestSuite(t *testing.T, fv FlinkVersion) {
 			t.Fatalf("UploadJar failed: %v", err)
 		}
 		t.Logf("  JAR uploaded: %s", filepath.Base(uploadResp.Filename))
+		testJarID = filepath.Base(uploadResp.Filename)
 
-		// Get JAR ID
-		jarID := filepath.Base(uploadResp.Filename)
+		// List JARs to verify upload
+		jars, err := client.ListJars(ctx)
+		if err != nil {
+			t.Fatalf("ListJars failed: %v", err)
+		}
+		if len(jars.Files) == 0 {
+			t.Error("expected at least one JAR after upload")
+		}
+		t.Logf("  JARs in system: %d", len(jars.Files))
+	})
 
-		// Run JAR
-		runResp, err := client.RunJar(ctx, jarID, JarRunRequest{Parallelism: 1})
+	// Test 6: Run JAR
+	t.Run("RunJAR", func(t *testing.T) {
+		if testJarID == "" {
+			t.Skip("no JAR ID available from previous test")
+		}
+
+		runResp, err := client.RunJar(ctx, testJarID, JarRunRequest{Parallelism: 1})
 		if err != nil {
 			t.Fatalf("RunJar failed: %v", err)
 		}
-		jobID := runResp.JobID
-		t.Logf("  Job started: %s", jobID)
+		testJobID = runResp.JobID
+		t.Logf("  Job started: %s", testJobID)
 
-		// Wait for job to start
-		time.Sleep(2 * time.Second)
+		// Wait for job to actually start running
+		time.Sleep(3 * time.Second)
+	})
 
-		// Get job details
-		job, err := client.GetJob(ctx, jobID)
+	// Test 7: Get Job Details
+	t.Run("GetJobDetails", func(t *testing.T) {
+		if testJobID == "" {
+			t.Skip("no job ID available")
+		}
+
+		job, err := client.GetJob(ctx, testJobID)
 		if err != nil {
-			t.Logf("  Warning: GetJob failed: %v", err)
-		} else {
-			t.Logf("  Job status: %s, vertices: %d", job.Status, len(job.Vertices))
+			t.Fatalf("GetJob failed: %v", err)
 		}
+		t.Logf("  Job ID: %s, Status: %s, Vertices: %d", job.ID, job.Status, len(job.Vertices))
 
-		// Cancel job
-		if err := client.CancelJob(ctx, jobID); err != nil {
-			t.Logf("  Warning: CancelJob failed: %v", err)
+		if job.ID != testJobID {
+			t.Errorf("expected job ID %s, got %s", testJobID, job.ID)
 		}
-
-		// Delete JAR
-		if err := client.DeleteJar(ctx, jarID); err != nil {
-			t.Logf("  Warning: DeleteJar failed: %v", err)
+		if len(job.Vertices) == 0 {
+			t.Error("expected job to have vertices")
 		}
 	})
 
-	// Test 6: Error Handling
+	// Test 8: Get Job Config
+	t.Run("GetJobConfig", func(t *testing.T) {
+		if testJobID == "" {
+			t.Skip("no job ID available")
+		}
+
+		config, err := client.GetJobConfig(ctx, testJobID)
+		if err != nil {
+			t.Fatalf("GetJobConfig failed: %v", err)
+		}
+		t.Logf("  Job config entries: %d", len(config.Entries))
+
+		if len(config.Entries) == 0 {
+			t.Error("expected job config to have entries")
+		}
+	})
+
+	// Test 9: Get Job Metrics
+	t.Run("GetJobMetrics", func(t *testing.T) {
+		if testJobID == "" {
+			t.Skip("no job ID available")
+		}
+
+		metrics, err := client.GetJobMetrics(ctx, testJobID)
+		if err != nil {
+			t.Fatalf("GetJobMetrics failed: %v", err)
+		}
+		t.Logf("  Job metrics: %d", len(metrics.Metrics))
+
+		if metrics.JobID != testJobID {
+			t.Errorf("expected metrics for job %s, got %s", testJobID, metrics.JobID)
+		}
+	})
+
+	// Test 10: Get Vertex Metrics
+	t.Run("GetVertexMetrics", func(t *testing.T) {
+		if testJobID == "" {
+			t.Skip("no job ID available")
+		}
+
+		// Get job to find a vertex ID
+		job, err := client.GetJob(ctx, testJobID)
+		if err != nil || len(job.Vertices) == 0 {
+			t.Skip("no vertices available")
+		}
+
+		vertexID := job.Vertices[0].ID
+		metrics, err := client.GetVertexMetrics(ctx, testJobID, vertexID)
+		if err != nil {
+			t.Fatalf("GetVertexMetrics failed: %v", err)
+		}
+		t.Logf("  Vertex metrics: %d", len(metrics))
+	})
+
+	// Test 11: Trigger Savepoint
+	var savepointTriggerID string
+	t.Run("TriggerSavepoint", func(t *testing.T) {
+		if testJobID == "" {
+			t.Skip("no job ID available")
+		}
+
+		resp, err := client.TriggerSavepoint(ctx, testJobID, SavepointTriggerRequest{
+			TargetDirectory: "file:///tmp/flink-savepoints",
+			CancelJob:       false,
+		})
+		if err != nil {
+			t.Fatalf("TriggerSavepoint failed: %v", err)
+		}
+		savepointTriggerID = resp.RequestID
+		t.Logf("  Savepoint triggered: %s", savepointTriggerID)
+	})
+
+	// Test 12: Get Savepoint Status
+	t.Run("GetSavepointStatus", func(t *testing.T) {
+		if testJobID == "" || savepointTriggerID == "" {
+			t.Skip("no savepoint trigger available")
+		}
+
+		// Poll for completion (with timeout)
+		deadline := time.Now().Add(20 * time.Second)
+		for time.Now().Before(deadline) {
+			status, err := client.GetSavepointStatus(ctx, testJobID, savepointTriggerID)
+			if err != nil {
+				t.Fatalf("GetSavepointStatus failed: %v", err)
+			}
+
+			if status.Operation.Location != "" {
+				t.Logf("  Savepoint completed: %s", status.Operation.Location)
+				return
+			}
+
+			if status.Operation.FailureCause.Class != "" {
+				t.Fatalf("Savepoint failed: %s", status.Operation.FailureCause.Class)
+			}
+
+			time.Sleep(2 * time.Second)
+		}
+		t.Log("  Savepoint still in progress (timeout)")
+	})
+
+	// Test 13: Cancel Job
+	t.Run("CancelJob", func(t *testing.T) {
+		if testJobID == "" {
+			t.Skip("no job ID available")
+		}
+
+		err := client.CancelJob(ctx, testJobID)
+		if err != nil {
+			t.Fatalf("CancelJob failed: %v", err)
+		}
+		t.Logf("  Job cancelled: %s", testJobID)
+
+		// Wait a bit for cancellation
+		time.Sleep(2 * time.Second)
+	})
+
+	// Test 14: Delete JAR
+	t.Run("DeleteJAR", func(t *testing.T) {
+		if testJarID == "" {
+			t.Skip("no JAR ID available")
+		}
+
+		err := client.DeleteJar(ctx, testJarID)
+		if err != nil {
+			t.Fatalf("DeleteJar failed: %v", err)
+		}
+		t.Logf("  JAR deleted: %s", testJarID)
+	})
+
+	// Test 15: Error Handling
 	t.Run("ErrorHandling", func(t *testing.T) {
 		_, err := client.GetJob(ctx, "non-existent-job-id")
 		if err == nil {
@@ -259,7 +437,7 @@ func TestVersionCompatibility(t *testing.T) {
 	for _, fv := range supportedVersions {
 		fv := fv
 		t.Run(fmt.Sprintf("Smoke_Flink_%s", fv.Version), func(t *testing.T) {
-			t.Parallel()
+			// Don't run in parallel - they all use the same container names and port
 
 			composeFile := filepath.Join("testdata", fv.ComposeFile)
 			if err := startFlinkCluster(composeFile); err != nil {
