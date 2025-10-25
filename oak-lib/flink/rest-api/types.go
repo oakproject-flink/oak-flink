@@ -54,9 +54,15 @@ type JobsOverview struct {
 
 // JobDetails represents detailed information about a specific job
 type JobDetails struct {
-	Job
-	Vertices []Vertex `json:"vertices"`
-	Plan     JobPlan  `json:"plan"`
+	// Note: Job details endpoint uses "jid" and "state" instead of "id" and "status"
+	ID        string    `json:"jid"`
+	Name      string    `json:"name"`
+	Status    JobStatus `json:"state"`
+	StartTime int64     `json:"start-time,omitempty"`
+	EndTime   int64     `json:"end-time,omitempty"`
+	Duration  int64     `json:"duration,omitempty"`
+	Vertices  []Vertex  `json:"vertices"`
+	Plan      JobPlan   `json:"plan"`
 }
 
 // Vertex represents a vertex (operator) in the job graph
@@ -159,4 +165,12 @@ type ConfigEntry struct {
 // ConfigResponse represents the configuration response
 type ConfigResponse struct {
 	Entries []ConfigEntry `json:"entries"`
+}
+
+// JobConfigResponse represents the job configuration response from /jobs/:jobid/config
+// This has a different structure than the cluster config endpoint
+type JobConfigResponse struct {
+	JobID           string                 `json:"jid"`
+	Name            string                 `json:"name"`
+	ExecutionConfig map[string]interface{} `json:"execution-config"`
 }

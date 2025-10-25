@@ -1,0 +1,68 @@
+package components
+
+import "fmt"
+
+templ JobsTable(jobs []map[string]interface{}) {
+	<div class="overflow-x-auto">
+		<table class="table table-zebra w-full">
+			<thead>
+				<tr>
+					<th>Job Name</th>
+					<th>Status</th>
+					<th>Cluster</th>
+					<th>Parallelism</th>
+					<th>Uptime</th>
+					<th>Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, job := range jobs {
+					<tr class="hover">
+						<td>
+							<div class="flex items-center gap-3">
+								<div class="avatar placeholder">
+									<div class="bg-neutral text-neutral-content rounded-lg w-10 h-10 flex items-center justify-center text-xs font-bold">
+										{ fmt.Sprintf("%s", job["id"])[0:2] }
+									</div>
+								</div>
+								<div>
+									<div class="font-bold">{ fmt.Sprintf("%s", job["name"]) }</div>
+									<div class="text-sm opacity-50">{ fmt.Sprintf("%s", job["id"]) }</div>
+								</div>
+							</div>
+						</td>
+						<td>
+							if fmt.Sprintf("%s", job["status"]) == "running" {
+								<span class="status-running">Running</span>
+							} else if fmt.Sprintf("%s", job["status"]) == "failing" {
+								<span class="status-failing">Failing</span>
+							} else if fmt.Sprintf("%s", job["status"]) == "pending" {
+								<span class="status-pending">Pending</span>
+							} else {
+								<span class="status-stopped">Stopped</span>
+							}
+						</td>
+						<td>{ fmt.Sprintf("%s", job["cluster"]) }</td>
+						<td>{ fmt.Sprintf("%v", job["parallelism"]) }</td>
+						<td>{ fmt.Sprintf("%s", job["uptime"]) }</td>
+						<td>
+							<div class="dropdown dropdown-end">
+								<label tabindex="0" class="btn btn-ghost btn-xs">
+									<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+									</svg>
+								</label>
+								<ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-lg bg-base-300 rounded-box w-52">
+									<li><a>View Details</a></li>
+									<li><a>Create Savepoint</a></li>
+									<li><a>Scale Job</a></li>
+									<li><a class="text-error">Cancel Job</a></li>
+								</ul>
+							</div>
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
+}

@@ -28,15 +28,30 @@ echo [OK] Docker is running
 echo.
 
 echo Running integration tests...
-echo (This will start a Flink cluster in Docker)
 echo.
 
-REM Run integration tests with tags (-count=1 disables test caching)
+REM Run Flink integration tests (requires Docker)
+echo [*] Flink REST API integration tests...
+echo     (This will start a Flink cluster in Docker)
+echo.
 go test -tags=integration -v -timeout 10m -count=1 ./oak-lib/flink/rest-api/...
 if errorlevel 1 (
     echo.
     echo ========================================
-    echo   ERROR: Integration tests failed!
+    echo   ERROR: Flink integration tests failed!
+    echo ========================================
+    exit /b 1
+)
+
+echo.
+echo [*] Oak Server gRPC integration tests...
+echo     (Uses in-memory connections, no Docker needed)
+echo.
+go test -tags=integration -v -timeout 5m -count=1 ./oak-server/internal/grpc/...
+if errorlevel 1 (
+    echo.
+    echo ========================================
+    echo   ERROR: Server integration tests failed!
     echo ========================================
     exit /b 1
 )

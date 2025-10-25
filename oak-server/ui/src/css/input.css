@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles for Oak Server */
+@layer components {
+  /* Glassmorphism effect for cards */
+  .glass-card {
+    @apply bg-base-100/80 backdrop-blur-md border border-base-300/50 shadow-xl;
+  }
+
+  /* Smooth transitions */
+  .transition-smooth {
+    @apply transition-all duration-300 ease-in-out;
+  }
+
+  /* Custom scrollbar for dark theme */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.primary') theme('colors.base-300');
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-base-300 rounded;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-primary rounded;
+  }
+
+  /* Metric card with hover effect */
+  .metric-card {
+    @apply glass-card p-6 transition-smooth hover:shadow-2xl hover:scale-105;
+  }
+
+  /* Status indicators */
+  .status-running {
+    @apply badge badge-success;
+  }
+
+  .status-failing {
+    @apply badge badge-error;
+  }
+
+  .status-pending {
+    @apply badge badge-warning;
+  }
+
+  .status-stopped {
+    @apply badge badge-ghost;
+  }
+}
+
+/* Chart container styling */
+.chart-container {
+  @apply glass-card p-6 h-80;
+}
+
+/* Animation keyframes */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

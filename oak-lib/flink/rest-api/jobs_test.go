@@ -102,8 +102,9 @@ func TestGetJob(t *testing.T) {
 			name:  "successful response",
 			jobID: "test-job-id",
 			responseBody: `{
-				"id": "test-job-id",
-				"status": "RUNNING",
+				"jid": "test-job-id",
+				"name": "Test Job",
+				"state": "RUNNING",
 				"vertices": [
 					{"id": "v1", "name": "Source", "parallelism": 2},
 					{"id": "v2", "name": "Map", "parallelism": 4}
@@ -226,10 +227,14 @@ func TestGetJobConfig(t *testing.T) {
 		{
 			name:  "successful response",
 			jobID: "test-job-id",
-			responseBody: `[
-				{"key": "execution-mode", "value": "PIPELINED"},
-				{"key": "restart-strategy", "value": "Cluster Level Restart Strategy"}
-			]`,
+			responseBody: `{
+				"jid": "test-job-id",
+				"name": "Test Job",
+				"execution-config": {
+					"execution-mode": "PIPELINED",
+					"restart-strategy": "Cluster Level Restart Strategy"
+				}
+			}`,
 			responseStatus: http.StatusOK,
 			wantErr:        false,
 			wantEntries:    2,

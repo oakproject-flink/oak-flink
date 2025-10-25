@@ -1,0 +1,147 @@
+package pages
+
+import "github.com/oakproject-flink/oak-flink/oak-server/web/templates/layouts"
+import "github.com/oakproject-flink/oak-flink/oak-server/web/templates/components"
+
+templ Dashboard(stats map[string]interface{}) {
+	@layouts.Base("Dashboard") {
+		<div class="space-y-6">
+			<!-- Page Header -->
+			<div class="flex items-center justify-between">
+				<div>
+					<h1 class="text-3xl font-bold">Dashboard</h1>
+					<p class="text-base-content/60">Monitor your Flink clusters and jobs</p>
+				</div>
+				<div class="flex gap-2">
+					<button class="btn btn-primary btn-sm">
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+						</svg>
+						Deploy Job
+					</button>
+					<button class="btn btn-ghost btn-sm">
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+						</svg>
+						Refresh
+					</button>
+				</div>
+			</div>
+
+			<!-- Stats Cards -->
+			@components.StatsCards(stats)
+
+			<!-- Charts Row -->
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+				<!-- Throughput Chart -->
+				<div class="chart-container">
+					<h3 class="text-lg font-semibold mb-4">Records Throughput</h3>
+					<div id="throughput-chart"></div>
+				</div>
+
+				<!-- CPU Usage Chart -->
+				<div class="chart-container">
+					<h3 class="text-lg font-semibold mb-4">CPU Usage</h3>
+					<div id="cpu-chart"></div>
+				</div>
+			</div>
+
+			<!-- Jobs Table -->
+			<div class="glass-card p-6">
+				<div class="flex items-center justify-between mb-4">
+					<h3 class="text-lg font-semibold">Recent Jobs</h3>
+					<a href="/jobs" class="link link-primary text-sm">View all</a>
+				</div>
+				<div
+					hx-get="/api/jobs"
+					hx-trigger="load, every 10s"
+					hx-swap="innerHTML"
+				>
+					<div class="loading loading-spinner loading-lg mx-auto"></div>
+				</div>
+			</div>
+
+			<!-- Initialize Charts -->
+			<script>
+				// Throughput Chart
+				const throughputChart = new ApexCharts(document.querySelector("#throughput-chart"), {
+					series: [{
+						name: 'Records/sec',
+						data: [6000, 7200, 6800, 7500, 8100, 7800, 8500, 8200, 7900, 8400]
+					}],
+					chart: {
+						type: 'area',
+						height: 250,
+						background: 'transparent',
+						toolbar: { show: false },
+						animations: { enabled: true }
+					},
+					theme: { mode: 'dark' },
+					stroke: { curve: 'smooth', width: 3 },
+					fill: {
+						type: 'gradient',
+						gradient: {
+							shadeIntensity: 1,
+							opacityFrom: 0.7,
+							opacityTo: 0.2,
+						}
+					},
+					colors: ['#10b981'],
+					xaxis: {
+						categories: ['10:00', '10:10', '10:20', '10:30', '10:40', '10:50', '11:00', '11:10', '11:20', '11:30'],
+						labels: { style: { colors: '#94a3b8' } }
+					},
+					yaxis: {
+						labels: { style: { colors: '#94a3b8' } }
+					},
+					grid: { borderColor: '#334155' },
+					tooltip: {
+						theme: 'dark',
+						x: { show: true }
+					}
+				});
+				throughputChart.render();
+
+				// CPU Usage Chart
+				const cpuChart = new ApexCharts(document.querySelector("#cpu-chart"), {
+					series: [{
+						name: 'CPU %',
+						data: [45, 52, 48, 55, 61, 58, 65, 62, 59, 64]
+					}],
+					chart: {
+						type: 'line',
+						height: 250,
+						background: 'transparent',
+						toolbar: { show: false }
+					},
+					theme: { mode: 'dark' },
+					stroke: { curve: 'smooth', width: 3 },
+					colors: ['#6366f1'],
+					xaxis: {
+						categories: ['10:00', '10:10', '10:20', '10:30', '10:40', '10:50', '11:00', '11:10', '11:20', '11:30'],
+						labels: { style: { colors: '#94a3b8' } }
+					},
+					yaxis: {
+						max: 100,
+						labels: { style: { colors: '#94a3b8' } }
+					},
+					grid: { borderColor: '#334155' },
+					tooltip: {
+						theme: 'dark',
+						x: { show: true }
+					},
+					markers: { size: 4 }
+				});
+				cpuChart.render();
+
+				// Real-time updates via SSE
+				const eventSource = new EventSource('/api/metrics/stream');
+				eventSource.onmessage = function(event) {
+					const metrics = JSON.parse(event.data);
+					console.log('Metrics update:', metrics);
+					// TODO: Update charts with new data
+				};
+			</script>
+		</div>
+	}
+}

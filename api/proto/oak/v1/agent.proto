@@ -1,0 +1,337 @@
+syntax = "proto3";
+
+package oak.v1;
+
+option go_package = "github.com/oakproject-flink/oak-flink/api/proto/oak/v1;oakv1";
+
+import "google/protobuf/timestamp.proto";
+
+// OakService handles bidirectional communication between agents and server
+service OakService {
+  // AgentStream establishes a bidirectional stream for agent communication
+  // The agent initiates the connection and both sides can send messages
+  rpc AgentStream(stream AgentMessage) returns (stream ServerMessage);
+
+  // Health check for Kubernetes liveness probes
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+
+  // GetAgentStatus returns the connection status of an agent
+  rpc GetAgentStatus(AgentStatusRequest) returns (AgentStatusResponse);
+}
+
+// AgentManagement handles agent registration and credential management
+// This service allows agents to request credentials without mTLS (first-time)
+service AgentManagement {
+  // RequestCredentials is called by agents to get credentials
+  // - First-time: Agent provides api_token (optional) or requests manual approval
+  // - Returns: credentials if approved, or pending status
+  rpc RequestCredentials(CredentialsRequest) returns (CredentialsResponse);
+
+  // CheckStatus allows agents to poll for approval status
+  // Used when agent is in PENDING state waiting for admin approval
+  rpc CheckStatus(StatusRequest) returns (StatusResponse);
+}
+
+// ============================================================================
+// Agent Management Messages (Credential Request/Response)
+// ============================================================================
+
+message CredentialsRequest {
+  string cluster_id = 1;        // Unique, persistent cluster identifier
+  string cluster_name = 2;      // Human-readable cluster name
+  string api_token = 3;         // Optional: if provided, auto-approve
+  string agent_version = 4;     // Agent version
+  string kubernetes_version = 5; // K8s version
+}
+
+message CredentialsResponse {
+  oneof result {
+    ApprovedCredentials approved = 1;
+    PendingApproval pending = 2;
+    RejectedRequest rejected = 3;
+  }
+}
+
+message ApprovedCredentials {
+  string agent_id = 1;          // Server-assigned UUID
+  string agent_secret = 2;      // Secret for authentication
+  bytes client_cert_pem = 3;    // Client certificate for mTLS
+  bytes client_key_pem = 4;     // Client private key for mTLS
+  bytes ca_cert_pem = 5;        // CA certificate to trust server
+}
+
+message PendingApproval {
+  string message = 1;                 // Human-readable message
+  int32 poll_interval_seconds = 2;    // How often agent should check back
+}
+
+message RejectedRequest {
+  string reason = 1;                  // Why the request was rejected
+}
+
+message StatusRequest {
+  string cluster_id = 1;              // Cluster ID to check status for
+}
+
+message StatusResponse {
+  enum Status {
+    STATUS_UNKNOWN = 0;
+    STATUS_PENDING = 1;     // Awaiting admin approval
+    STATUS_APPROVED = 2;    // Approved, credentials available
+    STATUS_REJECTED = 3;    // Rejected by admin
+    STATUS_REVOKED = 4;     // Previously approved, now revoked
+  }
+  Status status = 1;
+  ApprovedCredentials credentials = 2;  // Populated if status=APPROVED
+  string message = 3;                    // Additional context
+}
+
+// ============================================================================
+// Agent Messages (Agent → Server)
+// ============================================================================
+
+message AgentMessage {
+  string message_id = 1;  // Unique message ID for tracking
+  google.protobuf.Timestamp timestamp = 2;
+
+  oneof payload {
+    AgentRegistration registration = 10;
+    Heartbeat heartbeat = 11;
+    MetricsReport metrics = 12;
+    EventReport event = 13;
+    CommandResult command_result = 14;
+  }
+}
+
+// Agent registration - sent once on connection
+message AgentRegistration {
+  string cluster_id = 1;        // Unique cluster identifier
+  string cluster_name = 2;      // Human-readable cluster name
+  string agent_version = 3;     // Agent version (e.g., "0.1.0")
+  string kubernetes_version = 4; // K8s version (e.g., "1.28.0")
+  AgentCapabilities capabilities = 5;
+  map<string, string> labels = 6;  // Custom labels (env=prod, region=us-west)
+}
+
+message AgentCapabilities {
+  repeated string supported_flink_versions = 1;  // e.g., ["1.18", "1.19", "2.0"]
+  bool supports_savepoints = 2;
+  bool supports_scaling = 3;
+  bool supports_jar_upload = 4;
+}
+
+// Heartbeat - sent periodically to maintain connection
+message Heartbeat {
+  int32 active_jobs = 1;          // Number of active Flink jobs
+  AgentStatus status = 2;         // Agent health status
+  ResourceUsage resources = 3;    // Cluster resource usage
+}
+
+enum AgentStatus {
+  AGENT_STATUS_UNKNOWN = 0;
+  AGENT_STATUS_HEALTHY = 1;
+  AGENT_STATUS_DEGRADED = 2;
+  AGENT_STATUS_UNHEALTHY = 3;
+}
+
+message ResourceUsage {
+  double cpu_usage_percent = 1;
+  double memory_usage_percent = 2;
+  int32 total_pods = 3;
+  int32 running_pods = 4;
+}
+
+// Metrics report - contains metrics for one or more Flink jobs
+message MetricsReport {
+  repeated JobMetrics jobs = 1;
+}
+
+message JobMetrics {
+  string job_id = 1;
+  string job_name = 2;
+  JobState state = 3;
+  google.protobuf.Timestamp start_time = 4;
+  int32 parallelism = 5;
+
+  // Performance metrics
+  int64 records_in_per_second = 10;
+  int64 records_out_per_second = 11;
+  double backpressure_level = 12;      // 0.0 to 1.0
+  int64 checkpoint_duration_ms = 13;
+  int64 last_checkpoint_size_bytes = 14;
+
+  // Resource metrics
+  double cpu_usage_percent = 20;
+  int64 memory_usage_bytes = 21;
+  int64 network_io_bytes = 22;
+
+  // Kafka lag (if applicable)
+  map<string, int64> kafka_consumer_lag = 30;  // topic -> lag
+}
+
+enum JobState {
+  JOB_STATE_UNKNOWN = 0;
+  JOB_STATE_CREATED = 1;
+  JOB_STATE_RUNNING = 2;
+  JOB_STATE_FAILING = 3;
+  JOB_STATE_FAILED = 4;
+  JOB_STATE_CANCELLING = 5;
+  JOB_STATE_CANCELED = 6;
+  JOB_STATE_FINISHED = 7;
+  JOB_STATE_RESTARTING = 8;
+  JOB_STATE_SUSPENDED = 9;
+}
+
+// Event report - important events from the agent
+message EventReport {
+  EventType type = 1;
+  EventSeverity severity = 2;
+  string title = 3;
+  string message = 4;
+  map<string, string> metadata = 5;
+}
+
+enum EventType {
+  EVENT_TYPE_UNKNOWN = 0;
+  EVENT_TYPE_JOB_STARTED = 1;
+  EVENT_TYPE_JOB_FAILED = 2;
+  EVENT_TYPE_JOB_RESTARTED = 3;
+  EVENT_TYPE_SCALING_STARTED = 4;
+  EVENT_TYPE_SCALING_COMPLETED = 5;
+  EVENT_TYPE_SCALING_FAILED = 6;
+  EVENT_TYPE_SAVEPOINT_CREATED = 7;
+  EVENT_TYPE_SAVEPOINT_FAILED = 8;
+  EVENT_TYPE_AGENT_ERROR = 9;
+}
+
+enum EventSeverity {
+  EVENT_SEVERITY_UNKNOWN = 0;
+  EVENT_SEVERITY_INFO = 1;
+  EVENT_SEVERITY_WARNING = 2;
+  EVENT_SEVERITY_ERROR = 3;
+  EVENT_SEVERITY_CRITICAL = 4;
+}
+
+// Command result - response to server commands
+message CommandResult {
+  string command_id = 1;          // References the command from server
+  bool success = 2;
+  string message = 3;
+  google.protobuf.Timestamp completed_at = 4;
+  map<string, string> result_data = 5;  // Command-specific results
+}
+
+// ============================================================================
+// Server Messages (Server → Agent)
+// ============================================================================
+
+message ServerMessage {
+  string message_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+
+  oneof payload {
+    RegistrationAck registration_ack = 10;
+    Command command = 11;
+    ConfigUpdate config_update = 12;
+  }
+}
+
+// Registration acknowledgment
+message RegistrationAck {
+  string agent_id = 1;                 // Server-assigned agent ID
+  string welcome_message = 2;
+  google.protobuf.Timestamp server_time = 3;
+  AgentConfig config = 4;
+}
+
+message AgentConfig {
+  int32 heartbeat_interval_seconds = 1;  // How often to send heartbeat
+  int32 metrics_interval_seconds = 2;    // How often to send metrics
+  repeated string watched_namespaces = 3; // K8s namespaces to monitor
+}
+
+// Command from server to agent
+message Command {
+  string command_id = 1;
+  google.protobuf.Timestamp issued_at = 2;
+
+  oneof command {
+    ScaleJobCommand scale_job = 10;
+    CreateSavepointCommand create_savepoint = 11;
+    CancelJobCommand cancel_job = 12;
+    RestartJobCommand restart_job = 13;
+    DeployJobCommand deploy_job = 14;
+  }
+}
+
+message ScaleJobCommand {
+  string job_id = 1;
+  int32 new_parallelism = 2;
+  bool create_savepoint = 3;  // Create savepoint before scaling
+}
+
+message CreateSavepointCommand {
+  string job_id = 1;
+  string savepoint_path = 2;  // Where to store savepoint
+}
+
+message CancelJobCommand {
+  string job_id = 1;
+  bool with_savepoint = 2;
+}
+
+message RestartJobCommand {
+  string job_id = 1;
+  string from_savepoint = 2;  // Optional: restore from savepoint
+}
+
+message DeployJobCommand {
+  string job_name = 1;
+  string jar_url = 2;           // URL to download JAR
+  string entry_class = 3;
+  repeated string program_args = 4;
+  int32 parallelism = 5;
+  map<string, string> flink_config = 6;
+}
+
+// Configuration update
+message ConfigUpdate {
+  AgentConfig config = 1;
+}
+
+// ============================================================================
+// Health Check
+// ============================================================================
+
+message HealthCheckRequest {
+  string service = 1;
+}
+
+message HealthCheckResponse {
+  enum ServingStatus {
+    UNKNOWN = 0;
+    SERVING = 1;
+    NOT_SERVING = 2;
+  }
+  ServingStatus status = 1;
+}
+
+// ============================================================================
+// Agent Status Check
+// ============================================================================
+
+message AgentStatusRequest {
+  string cluster_id = 1;  // Cluster ID to check status for
+}
+
+message AgentStatusResponse {
+  enum ConnectionStatus {
+    UNKNOWN = 0;
+    CONNECTED = 1;
+    DISCONNECTED = 2;
+  }
+  ConnectionStatus status = 1;
+  string agent_id = 2;              // Populated if connected
+  google.protobuf.Timestamp last_seen = 3;  // Last heartbeat time
+  AgentStatus health_status = 4;     // Current health status
+}

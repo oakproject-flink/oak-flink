@@ -1,0 +1,54 @@
+package layouts
+
+templ Base(title string) {
+	<!DOCTYPE html>
+	<html lang="en" data-theme="oak">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ title } - Oak Server</title>
+
+			<!-- Tailwind CSS + DaisyUI -->
+			<link href="/static/css/output.css" rel="stylesheet"/>
+
+			<!-- HTMX -->
+			<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+
+			<!-- Alpine.js -->
+			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
+
+			<!-- ApexCharts -->
+			<script src="https://cdn.jsdelivr.net/npm/apexcharts@4.2.0"></script>
+
+			<!-- Mermaid.js -->
+			<script type="module">
+				import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+				mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+			</script>
+		</head>
+		<body class="bg-base-100 text-base-content custom-scrollbar" x-data="{ sidebarOpen: true }">
+			<div class="flex h-screen">
+				<!-- Sidebar -->
+				<aside
+					class="w-64 bg-base-200 border-r border-base-300 transition-all duration-300"
+					:class="sidebarOpen ? 'translate-x-0' : '-translate-x-64'"
+				>
+					@Sidebar()
+				</aside>
+
+				<!-- Main Content -->
+				<div class="flex-1 flex flex-col overflow-hidden">
+					<!-- Navbar -->
+					<header class="bg-base-200 border-b border-base-300">
+						@Navbar()
+					</header>
+
+					<!-- Page Content -->
+					<main class="flex-1 overflow-x-hidden overflow-y-auto bg-base-100 p-6">
+						{ children... }
+					</main>
+				</div>
+			</div>
+		</body>
+	</html>
+}

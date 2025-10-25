@@ -80,9 +80,20 @@ func (c *Client) GetJobConfig(ctx context.Context, jobID string) (*ConfigRespons
 		return nil, fmt.Errorf("failed to get job config for %s: %w", jobID, err)
 	}
 
-	var entries []ConfigEntry
-	if err := unmarshalResponse(resp, &entries); err != nil {
+	// The job config endpoint returns a different structure than cluster config
+	// It wraps config in "execution-config" field as a map
+	var jobConfig JobConfigResponse
+	if err := unmarshalResponse(resp, &jobConfig); err != nil {
 		return nil, err
+	}
+
+	// Convert the execution-config map to ConfigEntry array for consistency
+	entries := make([]ConfigEntry, 0, len(jobConfig.ExecutionConfig))
+	for key, value := range jobConfig.ExecutionConfig {
+		entries = append(entries, ConfigEntry{
+			Key:   key,
+			Value: fmt.Sprintf("%v", value),
+		})
 	}
 
 	return &ConfigResponse{Entries: entries}, nil
