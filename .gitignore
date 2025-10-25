@@ -15,6 +15,7 @@ vendor/
 # Markdown files (blacklist all, then whitelist)
 *.md
 !README.md
+!FORKING.md
 !LICENSE
 
 # Hidden files and folders (blacklist all, then whitelist)
